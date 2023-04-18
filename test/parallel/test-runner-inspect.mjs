@@ -11,7 +11,7 @@ common.skipIfInspectorDisabled();
 tmpdir.refresh();
 
 {
-  const child = new NodeInstance(['--test', '--inspect-brk=0'], undefined, fixtures.path('test-runner/index.test.js'));
+  const child = new NodeInstance(['--test', '--inspect-brk=0', '--inspect-port=9229'], undefined, fixtures.path('test-runner/index.test.js'));
 
   let stdout = '';
   let stderr = '';
@@ -31,7 +31,7 @@ tmpdir.refresh();
 
 
 {
-  const args = ['--test', '--inspect=0', fixtures.path('test-runner/index.js')];
+  const args = ['--test', '--inspect=0', '--inspect-port=9229', fixtures.path('test-runner/index.js')];
   const { stderr, stdout, code, signal } = await common.spawnPromisified(process.execPath, args);
 
   assert.match(stderr,
@@ -44,7 +44,7 @@ tmpdir.refresh();
 
 {
   // File not found.
-  const args = ['--test', '--inspect=0', 'a-random-file-that-does-not-exist.js'];
+  const args = ['--test', '--inspect=0', '--inspect-port=9229', 'a-random-file-that-does-not-exist.js'];
   const { stderr, stdout, code, signal } = await common.spawnPromisified(process.execPath, args);
 
   assert.strictEqual(stdout, '');
@@ -72,7 +72,7 @@ tmpdir.refresh();
 
   const { stderr, code, signal } = await common
           .spawnPromisified(process.execPath,
-                            ['--test', fixtures.path('v8-coverage/basic.js')],
+                            ['--test', '--inspect=0', '--inspect-port=9229', fixtures.path('v8-coverage/basic.js')],
                             { env: { ...process.env, NODE_V8_COVERAGE: coverageDirectory } });
 
   assert.strictEqual(stderr, '');
