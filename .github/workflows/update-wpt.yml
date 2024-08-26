@@ -13,45 +13,60 @@ jobs:
   wpt-update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332  # v4.1.7
+      - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      
+      # Generate bot token
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PEM }}
+
+      - name: Retrieve GitHub App User ID
+        id: get-user-id
+        run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
       - name: Clone WPT Repository
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332  # v4.1.7
+        uses: actions/checkout@v4
         with:
           repository: web-platform-tests/wpt
           path: test/fixtures/wpt
           sparse-checkout: |
             common/ eventsource/ fetch/ interfaces/ mimesniff/ resources/ service-workers/ storage/ websockets/ xhr/ LICENSE.md
           persist-credentials: false
+
       - name: Move WPT Files
         run: |
           rm -rf test/fixtures/wpt/.git
           echo "NEW_VERSION=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_USER_TOKEN }}
-      - name: Create PR with first commit
-        if: env.NEW_VERSION
-        uses: gr2m/create-or-update-pull-request-action@77596e3166f328b24613f7082ab30bf2d93079d5
-        # Creates a PR with the new WPT source code committed
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Commit and push any changes
+        id: push-changes
+        run: |
+          if [[ "$(git status --porcelain)" != "" ]]; then
+            git config --global user.name '${{steps.app-token.outputs.app-slug}}[bot]'
+            git config --global user.email '${{steps.get-user-id.outputs.user-id}}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com>'
+            git checkout -b actions/update-wpt
+            git add .
+            if (! git show-ref origin/actions/update-wpt -q) || [[ "$(git diff origin/actions/update-wpt --stat)" != "" ]]; then
+              echo "createPR=true" >> $GITHUB_OUTPUT
+              git commit -m "test: update WPT to ${{ env.NEW_VERSION }}"
+              gh auth setup-git
+              git push origin actions/update-wpt -fu --no-verify
+            fi
+          fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_USER_TOKEN }}
-        with:
-          author: Node.js GitHub Bot <github-bot@iojs.org>
-          body: This is an automated update of the WPT to ${{ env.NEW_VERSION }}.
-          branch: actions/update-wpt  # Custom branch *just* for this Action.
-          commit-message: 'test: update WPT to ${{ env.NEW_VERSION }}'
-          labels: test
-          title: 'test: update WPT to ${{ env.NEW_VERSION }}'
-          update-pull-request-title-and-body: true
-      - name: Add second commit
-        # Adds a second commit to the PR with any additional updates if needed
-        if: env.NEW_VERSION
-        uses: gr2m/create-or-update-pull-request-action@77596e3166f328b24613f7082ab30bf2d93079d5
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Open a PR for the sync
+        if: steps.push-changes.outputs.createPR
+        continue-on-error: true
+        run: gh pr create --head actions/update-wpt --title "test: update WPT to ${{ env.NEW_VERSION }}" --body "This is an automated update of the WPT to ${{ env.NEW_VERSION }}."
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_USER_TOKEN }}
-        with:
-          author: Node.js GitHub Bot <github-bot@iojs.org>
-          branch: actions/update-wpt  # Custom branch *just* for this Action.
-          commit-message: 'test: additional updates for WPT-${{ env.NEW_VERSION }}'
-          labels: test
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
