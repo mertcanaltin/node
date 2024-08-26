@@ -1,0 +1,45 @@
+name: Update WPT
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: 0 0 * * *
+
+jobs:
+  update-wpt:
+    name: Update WPT
+    permissions:
+      contents: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4  # Daha yeni bir versiyon kullanarak
+        with:
+          persist-credentials: true  # Bu satırı true yapın
+          sparse-checkout: |
+            !test/fixtures/wpt
+      - name: Clone WPT Repository
+        uses: actions/checkout@v4  # Daha yeni bir versiyon kullanarak
+        with:
+          repository: web-platform-tests/wpt
+          path: test/fixtures/wpt
+          sparse-checkout: |
+            common/ eventsource/ fetch/ interfaces/ mimesniff/ resources/ service-workers/ storage/ websockets/ xhr/ LICENSE.md
+          persist-credentials: true  # Bu satırı true yapın
+      - name: Move WPT Files
+        run: |
+          rm -rf test/fixtures/wpt/.git
+          echo "NEW_VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      - name: Create Or Update Pull Request
+        uses: gr2m/create-or-update-pull-request-action@v1  # Daha yeni bir versiyon kullanarak
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_USER_TOKEN }}
+        with:
+          author: Node.js GitHub Bot <github-bot@iojs.org>
+          body: This is an automated update of the WPT to ${{ env.NEW_VERSION }}.
+          branch: actions/update-wpt
+          commit-message: 'test: update WPT to ${{ env.NEW_VERSION }}'
+          labels: test
+          title: 'test: update WPT to ${{ env.NEW_VERSION }}'
+          update-pull-request-title-and-body: true
