@@ -14,25 +14,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4  # Daha yeni bir versiyon kullanarak
+        uses: actions/checkout@v4
         with:
-          persist-credentials: true  # Bu satırı true yapın
+          persist-credentials: true
           sparse-checkout: |
-            !test/fixtures/wpt
+            # Burada yalnızca dahil edilmesi gereken dizinleri listeleyin
+            src/
+            docs/
       - name: Clone WPT Repository
-        uses: actions/checkout@v4  # Daha yeni bir versiyon kullanarak
+        uses: actions/checkout@v4
         with:
           repository: web-platform-tests/wpt
           path: test/fixtures/wpt
           sparse-checkout: |
             common/ eventsource/ fetch/ interfaces/ mimesniff/ resources/ service-workers/ storage/ websockets/ xhr/ LICENSE.md
-          persist-credentials: true  # Bu satırı true yapın
+          persist-credentials: true
       - name: Move WPT Files
         run: |
           rm -rf test/fixtures/wpt/.git
           echo "NEW_VERSION=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - name: Create Or Update Pull Request
-        uses: gr2m/create-or-update-pull-request-action@v1  # Daha yeni bir versiyon kullanarak
+        uses: gr2m/create-or-update-pull-request-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GH_USER_TOKEN }}
         with:
