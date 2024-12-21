@@ -106,6 +106,7 @@
       'src/node_config.cc',
       'src/node_constants.cc',
       'src/node_contextify.cc',
+      'src/module_utils.cc',
       'src/node_credentials.cc',
       'src/node_debug.cc',
       'src/node_dir.cc',
@@ -314,6 +315,7 @@
       'src/udp_wrap.h',
       'src/util.h',
       'src/util-inl.h',
+      'src/module_utils.h'
     ],
     'node_crypto_sources': [
       'src/crypto/crypto_aes.cc',

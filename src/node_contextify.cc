@@ -35,9 +35,23 @@
 #include "node_url.h"
 #include "node_watchdog.h"
 #include "util-inl.h"
+#include "module_utils.h"
 
 namespace node {
 namespace contextify {
+
+v8::Local<v8::Value> CreateTopLevelAwaitError(v8::Isolate* isolate) {
+  return v8::Exception::SyntaxError(
+      v8::String::NewFromUtf8(
+          isolate,
+          "Top-level await is not supported in CommonJS modules. "
+          "To use top-level await, add \"type\": \"module\" to your "
+          "package.json "
+          "or rename the file to use the .mjs extension. Alternatively, wrap "
+          "the "
+          "await expression in an async function.")
+          .ToLocalChecked());
+}
 
 using errors::TryCatchScope;
 
@@ -1883,6 +1897,16 @@ static void ContainsModuleSyntax(const FunctionCallbackInfo<Value>& args) {
   CHECK(args[1]->IsString());
   Local<String> filename = args[1].As<String>();
 
+  bool contains_top_level_await = ContainsTopLevelAwait(code);
+  bool is_commonjs_module =
+      !EndsWith(filename, ".mjs") && !EndsWith(filename, ".jsmodule");
+
+  if (contains_top_level_await && is_commonjs_module) {
+    v8::Local<v8::Value> error =
+        node::contextify::CreateTopLevelAwaitError(isolate);
+    isolate->ThrowException(error);
+    return;
+  }
   // Argument 3: resource name (URL for ES module).
   Local<String> resource_name = filename;
   if (args[2]->IsString()) {
