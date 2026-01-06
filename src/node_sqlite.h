@@ -73,7 +73,8 @@ class DatabaseOpenConfiguration {
     initial_limits_[limit_id] = value;
   }
 
-  inline const std::map<int, int>& initial_limits() const {
+  inline const std::array<std::optional<int>, SQLITE_LIMIT_TRIGGER_DEPTH + 1>&
+  initial_limits() const {
     return initial_limits_;
   }
 
@@ -88,7 +89,8 @@ class DatabaseOpenConfiguration {
   bool allow_bare_named_params_ = true;
   bool allow_unknown_named_params_ = false;
   bool defensive_ = false;
-  std::array<std::optional<int>, SQLITE_LIMIT_TRIGGER_DEPTH + 1> initial_limits_;
+  std::array<std::optional<int>, SQLITE_LIMIT_TRIGGER_DEPTH + 1>
+      initial_limits_;
 };
 
 class DatabaseSync;
@@ -128,6 +130,7 @@ class DatabaseSync : public BaseObject {
  public:
   enum InternalFields {
     kAuthorizerCallback = BaseObject::kInternalFieldCount,
+    kLimitsObject,
     kInternalFieldCount
   };
 
@@ -205,7 +208,6 @@ class DatabaseSync : public BaseObject {
   std::set<BackupJob*> backups_;
   std::set<sqlite3_session*> sessions_;
   std::unordered_set<StatementSync*> statements_;
-  BaseObjectPtr<DatabaseSyncLimits> limits_object_;
 
   friend class DatabaseSyncLimits;
   friend class Session;

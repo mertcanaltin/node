@@ -345,7 +345,7 @@ class CustomAggregate {
   static inline void xStepBase(sqlite3_context* ctx,
                                int argc,
                                sqlite3_value** argv,
-                               Global<Function> CustomAggregate::*mptr) {
+                               Global<Function> CustomAggregate::* mptr) {
     CustomAggregate* self =
         static_cast<CustomAggregate*>(sqlite3_user_data(ctx));
     Environment* env = self->env_;
@@ -756,7 +756,7 @@ Intercepted DatabaseSyncLimits::LimitsGetter(
     return Intercepted::kNo;  // Unknown property, let default handling occur
   }
 
-  if (!limits->database_->IsOpen()) {
+  if (!limits->database_ || !limits->database_->IsOpen()) {
     THROW_ERR_INVALID_STATE(env, "database is not open");
     return Intercepted::kYes;
   }
@@ -788,7 +788,7 @@ Intercepted DatabaseSyncLimits::LimitsSetter(
     return Intercepted::kNo;
   }
 
-  if (!limits->database_->IsOpen()) {
+  if (!limits->database_ || !limits->database_->IsOpen()) {
     THROW_ERR_INVALID_STATE(env, "database is not open");
     return Intercepted::kYes;
   }
@@ -836,7 +836,11 @@ void DatabaseSyncLimits::LimitsEnumerator(
 
   for (size_t i = 0; i < kLimitMapping.size(); ++i) {
     Local<String> name;
-    if (String::NewFromUtf8(isolate, kLimitMapping[i].js_name).ToLocal(&name)) {
+    if (String::NewFromUtf8(isolate,
+                            kLimitMapping[i].js_name.data(),
+                            NewStringType::kNormal,
+                            kLimitMapping[i].js_name.size())
+            .ToLocal(&name)) {
       names.push_back(name);
     }
   }
@@ -953,8 +957,11 @@ bool DatabaseSync::Open() {
   sqlite3_busy_timeout(connection_, open_config_.get_timeout());
 
   // Apply initial limits
-  for (const auto& [limit_id, limit_val] : open_config_.initial_limits()) {
-    sqlite3_limit(connection_, limit_id, limit_val);
+  const auto& limits = open_config_.initial_limits();
+  for (size_t i = 0; i < limits.size(); ++i) {
+    if (limits[i].has_value()) {
+      sqlite3_limit(connection_, static_cast<int>(i), limits[i].value());
+    }
   }
 
   if (allow_load_extension_) {
@@ -1302,7 +1309,10 @@ void DatabaseSync::New(const FunctionCallbackInfo<Value>& args) {
       // Iterate through known limit names and extract values
       for (size_t i = 0; i < kLimitMapping.size(); ++i) {
         Local<String> key;
-        if (!String::NewFromUtf8(env->isolate(), kLimitMapping[i].js_name)
+        if (!String::NewFromUtf8(env->isolate(),
+                                 kLimitMapping[i].js_name.data(),
+                                 NewStringType::kNormal,
+                                 kLimitMapping[i].js_name.size())
                  .ToLocal(&key)) {
           return;
         }
@@ -1367,13 +1377,18 @@ void DatabaseSync::LimitsGetter(const FunctionCallbackInfo<Value>& args) {
   ASSIGN_OR_RETURN_UNWRAP(&db, args.This());
   Environment* env = Environment::GetCurrent(args);
 
-  if (!db->limits_object_) {
-    db->limits_object_ =
-        DatabaseSyncLimits::Create(env, BaseObjectWeakPtr<DatabaseSync>(db));
-  }
+  Local<Value> limits_val =
+      db->object()->GetInternalField(kLimitsObject).template As<Value>();
 
-  if (db->limits_object_) {
-    args.GetReturnValue().Set(db->limits_object_->object());
+  if (limits_val->IsUndefined()) {
+    BaseObjectPtr<DatabaseSyncLimits> limits =
+        DatabaseSyncLimits::Create(env, BaseObjectWeakPtr<DatabaseSync>(db));
+    if (limits) {
+      db->object()->SetInternalField(kLimitsObject, limits->object());
+      args.GetReturnValue().Set(limits->object());
+    }
+  } else {
+    args.GetReturnValue().Set(limits_val);
   }
 }
 
