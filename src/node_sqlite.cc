@@ -141,7 +141,7 @@ Local<DictionaryTemplate> getLazyIterTemplate(Environment* env) {
 
 // Mapping from JavaScript property names to SQLite limit constants
 struct LimitInfo {
-  const char* js_name;
+  std::string_view js_name;
   int sqlite_limit_id;
 };
 
