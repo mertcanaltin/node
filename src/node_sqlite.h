@@ -69,6 +69,14 @@ class DatabaseOpenConfiguration {
 
   inline bool get_enable_defensive() const { return defensive_; }
 
+  inline void set_initial_limit(int limit_id, int value) {
+    initial_limits_[limit_id] = value;
+  }
+
+  inline const std::map<int, int>& initial_limits() const {
+    return initial_limits_;
+  }
+
  private:
   std::string location_;
   bool read_only_ = false;
@@ -80,9 +88,11 @@ class DatabaseOpenConfiguration {
   bool allow_bare_named_params_ = true;
   bool allow_unknown_named_params_ = false;
   bool defensive_ = false;
+  std::map<int, int> initial_limits_;
 };
 
 class DatabaseSync;
+class DatabaseSyncLimits;
 class StatementSyncIterator;
 class StatementSync;
 class BackupJob;
@@ -146,6 +156,7 @@ class DatabaseSync : public BaseObject {
   static void EnableLoadExtension(
       const v8::FunctionCallbackInfo<v8::Value>& args);
   static void EnableDefensive(const v8::FunctionCallbackInfo<v8::Value>& args);
+  static void LimitsGetter(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void LoadExtension(const v8::FunctionCallbackInfo<v8::Value>& args);
   static void SetAuthorizer(const v8::FunctionCallbackInfo<v8::Value>& args);
   static int AuthorizerCallback(void* user_data,
@@ -194,7 +205,9 @@ class DatabaseSync : public BaseObject {
   std::set<BackupJob*> backups_;
   std::set<sqlite3_session*> sessions_;
   std::unordered_set<StatementSync*> statements_;
+  BaseObjectPtr<DatabaseSyncLimits> limits_object_;
 
+  friend class DatabaseSyncLimits;
   friend class Session;
   friend class SQLTagStore;
   friend class StatementExecutionHelper;
@@ -348,6 +361,38 @@ class UserDefinedFunction {
   v8::Global<v8::Function> fn_;
   DatabaseSync* db_;
   bool use_bigint_args_;
+};
+
+class DatabaseSyncLimits : public BaseObject {
+ public:
+  DatabaseSyncLimits(Environment* env,
+                     v8::Local<v8::Object> object,
+                     BaseObjectWeakPtr<DatabaseSync> database);
+  ~DatabaseSyncLimits() override;
+
+  void MemoryInfo(MemoryTracker* tracker) const override;
+  static v8::Local<v8::ObjectTemplate> GetTemplate(Environment* env);
+  static BaseObjectPtr<DatabaseSyncLimits> Create(
+      Environment* env,
+      BaseObjectWeakPtr<DatabaseSync> database);
+
+  static v8::Intercepted LimitsGetter(
+      v8::Local<v8::Name> property,
+      const v8::PropertyCallbackInfo<v8::Value>& info);
+  static v8::Intercepted LimitsSetter(
+      v8::Local<v8::Name> property,
+      v8::Local<v8::Value> value,
+      const v8::PropertyCallbackInfo<void>& info);
+  static v8::Intercepted LimitsQuery(
+      v8::Local<v8::Name> property,
+      const v8::PropertyCallbackInfo<v8::Integer>& info);
+  static void LimitsEnumerator(const v8::PropertyCallbackInfo<v8::Array>& info);
+
+  SET_MEMORY_INFO_NAME(DatabaseSyncLimits)
+  SET_SELF_SIZE(DatabaseSyncLimits)
+
+ private:
+  BaseObjectWeakPtr<DatabaseSync> database_;
 };
 
 }  // namespace sqlite
