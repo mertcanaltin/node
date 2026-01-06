@@ -12,6 +12,7 @@
 #include "threadpoolwork-inl.h"
 #include "util-inl.h"
 
+#include <array>
 #include <cinttypes>
 
 namespace node {
@@ -144,7 +145,7 @@ struct LimitInfo {
   int sqlite_limit_id;
 };
 
-static constexpr LimitInfo kLimitMapping[] = {
+static constexpr std::array<LimitInfo, 11> kLimitMapping = {{
     {"length", SQLITE_LIMIT_LENGTH},
     {"sqlLength", SQLITE_LIMIT_SQL_LENGTH},
     {"column", SQLITE_LIMIT_COLUMN},
@@ -156,13 +157,11 @@ static constexpr LimitInfo kLimitMapping[] = {
     {"likePatternLength", SQLITE_LIMIT_LIKE_PATTERN_LENGTH},
     {"variableNumber", SQLITE_LIMIT_VARIABLE_NUMBER},
     {"triggerDepth", SQLITE_LIMIT_TRIGGER_DEPTH},
-};
-
-static constexpr size_t kLimitMappingCount = arraysize(kLimitMapping);
+}};
 
 // Helper function to find limit ID from JS property name
 static int GetLimitIdFromName(const std::string& name) {
-  for (size_t i = 0; i < kLimitMappingCount; ++i) {
+  for (size_t i = 0; i < kLimitMapping.size(); ++i) {
     if (name == kLimitMapping[i].js_name) {
       return kLimitMapping[i].sqlite_limit_id;
     }
@@ -835,7 +834,7 @@ void DatabaseSyncLimits::LimitsEnumerator(
   Isolate* isolate = info.GetIsolate();
   LocalVector<Value> names(isolate);
 
-  for (size_t i = 0; i < kLimitMappingCount; ++i) {
+  for (size_t i = 0; i < kLimitMapping.size(); ++i) {
     Local<String> name;
     if (String::NewFromUtf8(isolate, kLimitMapping[i].js_name).ToLocal(&name)) {
       names.push_back(name);
@@ -1301,7 +1300,7 @@ void DatabaseSync::New(const FunctionCallbackInfo<Value>& args) {
       Local<Object> limits_obj = limits_v.As<Object>();
 
       // Iterate through known limit names and extract values
-      for (size_t i = 0; i < kLimitMappingCount; ++i) {
+      for (size_t i = 0; i < kLimitMapping.size(); ++i) {
         Local<String> key;
         if (!String::NewFromUtf8(env->isolate(), kLimitMapping[i].js_name)
                  .ToLocal(&key)) {

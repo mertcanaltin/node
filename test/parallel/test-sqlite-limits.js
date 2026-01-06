@@ -5,6 +5,23 @@ const { DatabaseSync } = require('node:sqlite');
 const { suite, test } = require('node:test');
 
 suite('DatabaseSync limits', () => {
+  test('default limits match expected SQLite defaults', (t) => {
+    const db = new DatabaseSync(':memory:');
+    t.assert.deepStrictEqual({ ...db.limits }, {
+      length: 1000000000,
+      sqlLength: 1000000000,
+      column: 2000,
+      exprDepth: 1000,
+      compoundSelect: 500,
+      vdbeOp: 250000000,
+      functionArg: 1000,
+      attach: 10,
+      likePatternLength: 50000,
+      variableNumber: 32766,
+      triggerDepth: 1000,
+    });
+  });
+
   test('constructor accepts limits option', (t) => {
     const db = new DatabaseSync(':memory:', {
       limits: {
@@ -33,7 +50,6 @@ suite('DatabaseSync limits', () => {
     t.assert.strictEqual(db.limits.likePatternLength, 1000);
     t.assert.strictEqual(db.limits.variableNumber, 100);
     t.assert.strictEqual(db.limits.triggerDepth, 5);
-    db.close();
   });
 
   test('getter returns current limit value', (t) => {
@@ -42,7 +58,6 @@ suite('DatabaseSync limits', () => {
     t.assert.ok(db.limits.length > 0);
     t.assert.strictEqual(typeof db.limits.sqlLength, 'number');
     t.assert.ok(db.limits.sqlLength > 0);
-    db.close();
   });
 
   test('setter modifies limit value', (t) => {
@@ -56,8 +71,6 @@ suite('DatabaseSync limits', () => {
 
     db.limits.column = 50;
     t.assert.strictEqual(db.limits.column, 50);
-
-    db.close();
   });
 
   test('throws on invalid argument type', (t) => {
@@ -68,7 +81,6 @@ suite('DatabaseSync limits', () => {
       name: 'TypeError',
       message: /Limit value must be an integer/,
     });
-    db.close();
   });
 
   test('throws on negative value', (t) => {
@@ -79,7 +91,6 @@ suite('DatabaseSync limits', () => {
       name: 'RangeError',
       message: /Limit value must be non-negative/,
     });
-    db.close();
   });
 
   test('throws on getter access after close', (t) => {
@@ -118,7 +129,6 @@ suite('DatabaseSync limits', () => {
     t.assert.ok(keys.includes('likePatternLength'));
     t.assert.ok(keys.includes('variableNumber'));
     t.assert.ok(keys.includes('triggerDepth'));
-    db.close();
   });
 
   test('throws on invalid limits option type', (t) => {
@@ -156,6 +166,21 @@ suite('DatabaseSync limits', () => {
     });
     t.assert.strictEqual(db.limits.length, 100000);
     t.assert.strictEqual(typeof db.limits.sqlLength, 'number');
-    db.close();
+  });
+
+  test('throws when exceeding column limit', (t) => {
+    const db = new DatabaseSync(':memory:', {
+      limits: {
+        column: 10,
+      }
+    });
+
+    db.exec('CREATE TABLE t1 (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10)');
+
+    t.assert.throws(() => {
+      db.exec('CREATE TABLE t2 (c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11)');
+    }, {
+      message: /too many columns/,
+    });
   });
 });
