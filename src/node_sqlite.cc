@@ -201,21 +201,11 @@ static constexpr std::array<LimitInfo, 11> kLimitMapping = {{
     {"triggerDepth", SQLITE_LIMIT_TRIGGER_DEPTH, SQLITE_MAX_TRIGGER_DEPTH},
 }};
 
-// Helper function to find limit ID from JS property name
-static constexpr int GetLimitIdFromName(std::string_view name) {
-  for (const auto& info : kLimitMapping) {
-    if (name == info.js_name) {
-      return info.sqlite_limit_id;
-    }
-  }
-  return -1;  // Not found
-}
-
-// Helper function to get max value for a limit ID
-static constexpr int GetMaxValueForLimitId(int limit_id) {
-  for (const auto& info : kLimitMapping) {
-    if (info.sqlite_limit_id == limit_id) {
-      return info.max_value;
+// Helper function to find limit index from JS property name
+static constexpr int GetLimitIndexFromName(std::string_view name) {
+  for (size_t i = 0; i < kLimitMapping.size(); ++i) {
+    if (name == kLimitMapping[i].js_name) {
+      return static_cast<int>(i);
     }
   }
   return -1;  // Not found
@@ -802,9 +792,9 @@ Intercepted DatabaseSyncLimits::LimitsGetter(
   Isolate* isolate = env->isolate();
 
   Utf8Value prop_name(isolate, property);
-  int limit_id = GetLimitIdFromName(prop_name.ToStringView());
+  int idx = GetLimitIndexFromName(prop_name.ToStringView());
 
-  if (limit_id < 0) {
+  if (idx < 0) {
     return Intercepted::kNo;  // Unknown property, let default handling occur
   }
 
@@ -813,8 +803,8 @@ Intercepted DatabaseSyncLimits::LimitsGetter(
     return Intercepted::kYes;
   }
 
-  int current_value =
-      sqlite3_limit(limits->database_->Connection(), limit_id, -1);
+  int current_value = sqlite3_limit(
+      limits->database_->Connection(), kLimitMapping[idx].sqlite_limit_id, -1);
   info.GetReturnValue().Set(Integer::New(isolate, current_value));
   return Intercepted::kYes;
 }
@@ -834,9 +824,9 @@ Intercepted DatabaseSyncLimits::LimitsSetter(
   Isolate* isolate = env->isolate();
 
   Utf8Value prop_name(isolate, property);
-  int limit_id = GetLimitIdFromName(*prop_name);
+  int idx = GetLimitIndexFromName(*prop_name);
 
-  if (limit_id < 0) {
+  if (idx < 0) {
     return Intercepted::kNo;
   }
 
@@ -859,14 +849,15 @@ Intercepted DatabaseSyncLimits::LimitsSetter(
   }
 
   // Validate against compile-time maximum
-  int max_value = GetMaxValueForLimitId(limit_id);
-  if (new_value > max_value) {
+  if (new_value > kLimitMapping[idx].max_value) {
     THROW_ERR_OUT_OF_RANGE(isolate,
                            "Limit value exceeds compile-time maximum.");
     return Intercepted::kYes;
   }
 
-  sqlite3_limit(limits->database_->Connection(), limit_id, new_value);
+  sqlite3_limit(limits->database_->Connection(),
+                kLimitMapping[idx].sqlite_limit_id,
+                new_value);
   return Intercepted::kYes;
 }
 
@@ -878,9 +869,9 @@ Intercepted DatabaseSyncLimits::LimitsQuery(
 
   Isolate* isolate = info.GetIsolate();
   Utf8Value prop_name(isolate, property);
-  int limit_id = GetLimitIdFromName(prop_name.ToStringView());
+  int idx = GetLimitIndexFromName(prop_name.ToStringView());
 
-  if (limit_id < 0) {
+  if (idx < 0) {
     return Intercepted::kNo;
   }
 
