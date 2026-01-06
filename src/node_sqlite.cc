@@ -1326,7 +1326,7 @@ void DatabaseSync::New(const FunctionCallbackInfo<Value>& args) {
             std::string msg = "The \"options.limits." +
                               std::string(kLimitMapping[i].js_name) +
                               "\" argument must be non-negative.";
-            THROW_ERR_OUT_OF_RANGE(env->isolate(), msg.c_str());
+            THROW_ERR_OUT_OF_RANGE(env->isolate(), msg);
             return;
           }
 
