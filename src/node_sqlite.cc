@@ -1317,7 +1317,7 @@ void DatabaseSync::New(const FunctionCallbackInfo<Value>& args) {
             std::string msg = "The \"options.limits." +
                               std::string(kLimitMapping[i].js_name) +
                               "\" argument must be an integer.";
-            THROW_ERR_INVALID_ARG_TYPE(env->isolate(), msg.c_str());
+            THROW_ERR_INVALID_ARG_TYPE(env->isolate(), msg);
             return;
           }
 
