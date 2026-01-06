@@ -161,9 +161,9 @@ static constexpr std::array<LimitInfo, 11> kLimitMapping = {{
 
 // Helper function to find limit ID from JS property name
 static int GetLimitIdFromName(const std::string& name) {
-  for (size_t i = 0; i < kLimitMapping.size(); ++i) {
-    if (name == kLimitMapping[i].js_name) {
-      return kLimitMapping[i].sqlite_limit_id;
+  for (const auto& [limit_name, id] : kLimitMapping) {
+    if (name == limit_name) {
+      return id;
     }
   }
   return -1;  // Not found
