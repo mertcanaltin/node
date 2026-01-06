@@ -158,6 +158,25 @@ suite('DatabaseSync limits', () => {
     });
   });
 
+  test('throws on value exceeding compile-time maximum via setter', (t) => {
+    const db = new DatabaseSync(':memory:');
+    t.assert.throws(() => {
+      db.limits.attach = 100;
+    }, {
+      name: 'RangeError',
+      message: /Limit value exceeds compile-time maximum/,
+    });
+  });
+
+  test('throws on value exceeding compile-time maximum in constructor', (t) => {
+    t.assert.throws(() => {
+      new DatabaseSync(':memory:', { limits: { attach: 100 } });
+    }, {
+      name: 'RangeError',
+      message: /options\.limits\.attach.*exceeds compile-time maximum/,
+    });
+  });
+
   test('partial limits in constructor', (t) => {
     const db = new DatabaseSync(':memory:', {
       limits: {

@@ -140,30 +140,82 @@ Local<DictionaryTemplate> getLazyIterTemplate(Environment* env) {
 }  // namespace
 
 // Mapping from JavaScript property names to SQLite limit constants
+// Default compile-time maximums from SQLite (these match SQLite's defaults)
+#ifndef SQLITE_MAX_LENGTH
+#define SQLITE_MAX_LENGTH 1000000000
+#endif
+#ifndef SQLITE_MAX_SQL_LENGTH
+#define SQLITE_MAX_SQL_LENGTH 1000000000
+#endif
+#ifndef SQLITE_MAX_COLUMN
+#define SQLITE_MAX_COLUMN 2000
+#endif
+#ifndef SQLITE_MAX_EXPR_DEPTH
+#define SQLITE_MAX_EXPR_DEPTH 1000
+#endif
+#ifndef SQLITE_MAX_COMPOUND_SELECT
+#define SQLITE_MAX_COMPOUND_SELECT 500
+#endif
+#ifndef SQLITE_MAX_VDBE_OP
+#define SQLITE_MAX_VDBE_OP 250000000
+#endif
+#ifndef SQLITE_MAX_FUNCTION_ARG
+#define SQLITE_MAX_FUNCTION_ARG 1000
+#endif
+#ifndef SQLITE_MAX_ATTACHED
+#define SQLITE_MAX_ATTACHED 10
+#endif
+#ifndef SQLITE_MAX_LIKE_PATTERN_LENGTH
+#define SQLITE_MAX_LIKE_PATTERN_LENGTH 50000
+#endif
+#ifndef SQLITE_MAX_VARIABLE_NUMBER
+#define SQLITE_MAX_VARIABLE_NUMBER 32766
+#endif
+#ifndef SQLITE_MAX_TRIGGER_DEPTH
+#define SQLITE_MAX_TRIGGER_DEPTH 1000
+#endif
+
 struct LimitInfo {
   std::string_view js_name;
   int sqlite_limit_id;
+  int max_value;
 };
 
 static constexpr std::array<LimitInfo, 11> kLimitMapping = {{
-    {"length", SQLITE_LIMIT_LENGTH},
-    {"sqlLength", SQLITE_LIMIT_SQL_LENGTH},
-    {"column", SQLITE_LIMIT_COLUMN},
-    {"exprDepth", SQLITE_LIMIT_EXPR_DEPTH},
-    {"compoundSelect", SQLITE_LIMIT_COMPOUND_SELECT},
-    {"vdbeOp", SQLITE_LIMIT_VDBE_OP},
-    {"functionArg", SQLITE_LIMIT_FUNCTION_ARG},
-    {"attach", SQLITE_LIMIT_ATTACHED},
-    {"likePatternLength", SQLITE_LIMIT_LIKE_PATTERN_LENGTH},
-    {"variableNumber", SQLITE_LIMIT_VARIABLE_NUMBER},
-    {"triggerDepth", SQLITE_LIMIT_TRIGGER_DEPTH},
+    {"length", SQLITE_LIMIT_LENGTH, SQLITE_MAX_LENGTH},
+    {"sqlLength", SQLITE_LIMIT_SQL_LENGTH, SQLITE_MAX_SQL_LENGTH},
+    {"column", SQLITE_LIMIT_COLUMN, SQLITE_MAX_COLUMN},
+    {"exprDepth", SQLITE_LIMIT_EXPR_DEPTH, SQLITE_MAX_EXPR_DEPTH},
+    {"compoundSelect",
+     SQLITE_LIMIT_COMPOUND_SELECT,
+     SQLITE_MAX_COMPOUND_SELECT},
+    {"vdbeOp", SQLITE_LIMIT_VDBE_OP, SQLITE_MAX_VDBE_OP},
+    {"functionArg", SQLITE_LIMIT_FUNCTION_ARG, SQLITE_MAX_FUNCTION_ARG},
+    {"attach", SQLITE_LIMIT_ATTACHED, SQLITE_MAX_ATTACHED},
+    {"likePatternLength",
+     SQLITE_LIMIT_LIKE_PATTERN_LENGTH,
+     SQLITE_MAX_LIKE_PATTERN_LENGTH},
+    {"variableNumber",
+     SQLITE_LIMIT_VARIABLE_NUMBER,
+     SQLITE_MAX_VARIABLE_NUMBER},
+    {"triggerDepth", SQLITE_LIMIT_TRIGGER_DEPTH, SQLITE_MAX_TRIGGER_DEPTH},
 }};
 
 // Helper function to find limit ID from JS property name
 static constexpr int GetLimitIdFromName(std::string_view name) {
-  for (const auto& [limit_name, id] : kLimitMapping) {
-    if (name == limit_name) {
-      return id;
+  for (const auto& info : kLimitMapping) {
+    if (name == info.js_name) {
+      return info.sqlite_limit_id;
+    }
+  }
+  return -1;  // Not found
+}
+
+// Helper function to get max value for a limit ID
+static constexpr int GetMaxValueForLimitId(int limit_id) {
+  for (const auto& info : kLimitMapping) {
+    if (info.sqlite_limit_id == limit_id) {
+      return info.max_value;
     }
   }
   return -1;  // Not found
@@ -345,7 +397,7 @@ class CustomAggregate {
   static inline void xStepBase(sqlite3_context* ctx,
                                int argc,
                                sqlite3_value** argv,
-                               Global<Function> CustomAggregate::*mptr) {
+                               Global<Function> CustomAggregate::* mptr) {
     CustomAggregate* self =
         static_cast<CustomAggregate*>(sqlite3_user_data(ctx));
     Environment* env = self->env_;
@@ -803,6 +855,14 @@ Intercepted DatabaseSyncLimits::LimitsSetter(
   // Validate non-negative
   if (new_value < 0) {
     THROW_ERR_OUT_OF_RANGE(isolate, "Limit value must be non-negative.");
+    return Intercepted::kYes;
+  }
+
+  // Validate against compile-time maximum
+  int max_value = GetMaxValueForLimitId(limit_id);
+  if (new_value > max_value) {
+    THROW_ERR_OUT_OF_RANGE(isolate,
+                           "Limit value exceeds compile-time maximum.");
     return Intercepted::kYes;
   }
 
@@ -1336,6 +1396,14 @@ void DatabaseSync::New(const FunctionCallbackInfo<Value>& args) {
             std::string msg = "The \"options.limits." +
                               std::string(kLimitMapping[i].js_name) +
                               "\" argument must be non-negative.";
+            THROW_ERR_OUT_OF_RANGE(env->isolate(), msg);
+            return;
+          }
+
+          if (limit_val > kLimitMapping[i].max_value) {
+            std::string msg = "The \"options.limits." +
+                              std::string(kLimitMapping[i].js_name) +
+                              "\" argument exceeds compile-time maximum.";
             THROW_ERR_OUT_OF_RANGE(env->isolate(), msg);
             return;
           }
