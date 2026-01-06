@@ -750,7 +750,7 @@ Intercepted DatabaseSyncLimits::LimitsGetter(
   Isolate* isolate = env->isolate();
 
   Utf8Value prop_name(isolate, property);
-  int limit_id = GetLimitIdFromName(*prop_name);
+  int limit_id = GetLimitIdFromName(prop_name.ToStringView());
 
   if (limit_id < 0) {
     return Intercepted::kNo;  // Unknown property, let default handling occur
