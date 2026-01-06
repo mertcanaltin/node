@@ -738,8 +738,7 @@ Local<ObjectTemplate> DatabaseSyncLimits::GetTemplate(Environment* env) {
 }
 
 Intercepted DatabaseSyncLimits::LimitsGetter(
-    Local<Name> property,
-    const PropertyCallbackInfo<Value>& info) {
+    Local<Name> property, const PropertyCallbackInfo<Value>& info) {
   // Skip symbols
   if (!property->IsString()) {
     return Intercepted::kNo;
@@ -813,8 +812,7 @@ Intercepted DatabaseSyncLimits::LimitsSetter(
 }
 
 Intercepted DatabaseSyncLimits::LimitsQuery(
-    Local<Name> property,
-    const PropertyCallbackInfo<Integer>& info) {
+    Local<Name> property, const PropertyCallbackInfo<Integer>& info) {
   if (!property->IsString()) {
     return Intercepted::kNo;
   }
@@ -828,8 +826,7 @@ Intercepted DatabaseSyncLimits::LimitsQuery(
   }
 
   // Property exists and is writable
-  info.GetReturnValue().Set(
-      Integer::New(isolate, v8::PropertyAttribute::None));
+  info.GetReturnValue().Set(Integer::New(isolate, v8::PropertyAttribute::None));
   return Intercepted::kYes;
 }
 
@@ -849,8 +846,7 @@ void DatabaseSyncLimits::LimitsEnumerator(
 }
 
 BaseObjectPtr<DatabaseSyncLimits> DatabaseSyncLimits::Create(
-    Environment* env,
-    BaseObjectWeakPtr<DatabaseSync> database) {
+    Environment* env, BaseObjectWeakPtr<DatabaseSync> database) {
   Local<Object> obj;
   if (!GetTemplate(env)->NewInstance(env->context()).ToLocal(&obj)) {
     return nullptr;
@@ -1290,7 +1286,8 @@ void DatabaseSync::New(const FunctionCallbackInfo<Value>& args) {
 
     // Parse limits option
     Local<Value> limits_v;
-    if (!options->Get(env->context(), env->limits_string()).ToLocal(&limits_v)) {
+    if (!options->Get(env->context(), env->limits_string())
+             .ToLocal(&limits_v)) {
       return;
     }
     if (!limits_v->IsUndefined()) {
@@ -1372,8 +1369,8 @@ void DatabaseSync::LimitsGetter(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
 
   if (!db->limits_object_) {
-    db->limits_object_ = DatabaseSyncLimits::Create(
-        env, BaseObjectWeakPtr<DatabaseSync>(db));
+    db->limits_object_ =
+        DatabaseSyncLimits::Create(env, BaseObjectWeakPtr<DatabaseSync>(db));
   }
 
   if (db->limits_object_) {

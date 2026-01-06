@@ -373,8 +373,7 @@ class DatabaseSyncLimits : public BaseObject {
   void MemoryInfo(MemoryTracker* tracker) const override;
   static v8::Local<v8::ObjectTemplate> GetTemplate(Environment* env);
   static BaseObjectPtr<DatabaseSyncLimits> Create(
-      Environment* env,
-      BaseObjectWeakPtr<DatabaseSync> database);
+      Environment* env, BaseObjectWeakPtr<DatabaseSync> database);
 
   static v8::Intercepted LimitsGetter(
       v8::Local<v8::Name> property,
