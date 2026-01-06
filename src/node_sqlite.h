@@ -88,7 +88,7 @@ class DatabaseOpenConfiguration {
   bool allow_bare_named_params_ = true;
   bool allow_unknown_named_params_ = false;
   bool defensive_ = false;
-  std::map<int, int> initial_limits_;
+  std::array<std::optional<int>, SQLITE_LIMIT_TRIGGER_DEPTH + 1> initial_limits_;
 };
 
 class DatabaseSync;
