@@ -160,7 +160,7 @@ static constexpr std::array<LimitInfo, 11> kLimitMapping = {{
 }};
 
 // Helper function to find limit ID from JS property name
-static int GetLimitIdFromName(const std::string& name) {
+static constexpr int GetLimitIdFromName(std::string_view name) {
   for (const auto& [limit_name, id] : kLimitMapping) {
     if (name == limit_name) {
       return id;
