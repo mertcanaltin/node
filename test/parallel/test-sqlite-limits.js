@@ -23,9 +23,9 @@ suite('DatabaseSync limits', () => {
 
     for (const prop of expectedProperties) {
       t.assert.strictEqual(typeof db.limits[prop], 'number',
-        `${prop} should be a number`);
+                           `${prop} should be a number`);
       t.assert.ok(db.limits[prop] > 0,
-        `${prop} should be positive`);
+                  `${prop} should be positive`);
     }
   });
 
