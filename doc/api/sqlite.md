@@ -158,30 +158,20 @@ changes:
   * `limits` {Object} Configuration for various SQLite limits. These limits
     can be used to prevent excessive resource consumption when handling
     potentially malicious input. See [Run-Time Limits][] and [Limit Constants][]
-    in the SQLite documentation for details. The following properties are
-    supported:
+    in the SQLite documentation for details. Default values are determined by
+    SQLite's compile-time defaults and may vary depending on how SQLite was
+    built. The following properties are supported:
     * `length` {number} Maximum length of a string or BLOB.
-      **Default:** `1000000000`.
     * `sqlLength` {number} Maximum length of an SQL statement.
-      **Default:** `1000000000`.
     * `column` {number} Maximum number of columns.
-      **Default:** `2000`.
     * `exprDepth` {number} Maximum depth of expression tree.
-      **Default:** `1000`.
     * `compoundSelect` {number} Maximum number of terms in compound SELECT.
-      **Default:** `500`.
     * `vdbeOp` {number} Maximum number of VDBE instructions.
-      **Default:** `250000000`.
     * `functionArg` {number} Maximum number of function arguments.
-      **Default:** `1000`.
     * `attach` {number} Maximum number of attached databases.
-      **Default:** `10`.
     * `likePatternLength` {number} Maximum length of LIKE pattern.
-      **Default:** `50000`.
     * `variableNumber` {number} Maximum number of SQL variables.
-      **Default:** `32766`.
     * `triggerDepth` {number} Maximum trigger recursion depth.
-      **Default:** `1000`.
 
 Constructs a new `DatabaseSync` instance.
 

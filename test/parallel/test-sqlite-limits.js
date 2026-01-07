@@ -5,21 +5,28 @@ const { DatabaseSync } = require('node:sqlite');
 const { suite, test } = require('node:test');
 
 suite('DatabaseSync limits', () => {
-  test('default limits match expected SQLite defaults', (t) => {
+  test('limits object has expected properties with positive values', (t) => {
     const db = new DatabaseSync(':memory:');
-    t.assert.deepStrictEqual({ ...db.limits }, {
-      length: 1000000000,
-      sqlLength: 1000000000,
-      column: 2000,
-      exprDepth: 1000,
-      compoundSelect: 500,
-      vdbeOp: 250000000,
-      functionArg: 1000,
-      attach: 10,
-      likePatternLength: 50000,
-      variableNumber: 32766,
-      triggerDepth: 1000,
-    });
+    const expectedProperties = [
+      'length',
+      'sqlLength',
+      'column',
+      'exprDepth',
+      'compoundSelect',
+      'vdbeOp',
+      'functionArg',
+      'attach',
+      'likePatternLength',
+      'variableNumber',
+      'triggerDepth',
+    ];
+
+    for (const prop of expectedProperties) {
+      t.assert.strictEqual(typeof db.limits[prop], 'number',
+        `${prop} should be a number`);
+      t.assert.ok(db.limits[prop] > 0,
+        `${prop} should be positive`);
+    }
   });
 
   test('constructor accepts limits option', (t) => {
@@ -155,25 +162,6 @@ suite('DatabaseSync limits', () => {
     }, {
       name: 'RangeError',
       message: /options\.limits\.length.*must be non-negative/,
-    });
-  });
-
-  test('throws on value exceeding compile-time maximum via setter', (t) => {
-    const db = new DatabaseSync(':memory:');
-    t.assert.throws(() => {
-      db.limits.attach = 100;
-    }, {
-      name: 'RangeError',
-      message: /Limit value exceeds compile-time maximum/,
-    });
-  });
-
-  test('throws on value exceeding compile-time maximum in constructor', (t) => {
-    t.assert.throws(() => {
-      new DatabaseSync(':memory:', { limits: { attach: 100 } });
-    }, {
-      name: 'RangeError',
-      message: /options\.limits\.attach.*exceeds compile-time maximum/,
     });
   });
 
