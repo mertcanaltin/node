@@ -14,6 +14,7 @@
 
 #include <array>
 #include <cinttypes>
+#include <climits>
 
 namespace node {
 namespace sqlite {
@@ -793,16 +794,21 @@ Intercepted DatabaseSyncLimits::LimitsSetter(
     return Intercepted::kYes;
   }
 
-  if (!value->IsInt32()) {
-    THROW_ERR_INVALID_ARG_TYPE(isolate, "Limit value must be an integer.");
-    return Intercepted::kYes;
-  }
+  int new_value;
 
-  int new_value = value.As<Int32>()->Value();
-
-  // Validate non-negative
-  if (new_value < 0) {
-    THROW_ERR_OUT_OF_RANGE(isolate, "Limit value must be non-negative.");
+  if (value->IsNull()) {
+    // null resets the limit to the compile-time maximum
+    new_value = INT_MAX;
+  } else if (value->IsInt32()) {
+    new_value = value.As<Int32>()->Value();
+    // Validate non-negative
+    if (new_value < 0) {
+      THROW_ERR_OUT_OF_RANGE(isolate, "Limit value must be non-negative.");
+      return Intercepted::kYes;
+    }
+  } else {
+    THROW_ERR_INVALID_ARG_TYPE(
+        isolate, "Limit value must be an integer or null.");
     return Intercepted::kYes;
   }
 

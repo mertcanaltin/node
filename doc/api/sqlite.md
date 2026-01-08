@@ -479,11 +479,16 @@ console.log(db.limits.length);
 
 // Set a new limit
 db.limits.sqlLength = 100000;
+
+// Reset a limit to its compile-time maximum
+db.limits.sqlLength = null;
 ```
 
 Available properties: `length`, `sqlLength`, `column`, `exprDepth`,
 `compoundSelect`, `vdbeOp`, `functionArg`, `attach`, `likePatternLength`,
 `variableNumber`, `triggerDepth`.
+
+Setting a property to `null` resets the limit to its compile-time maximum value.
 
 ### `database.open()`
 

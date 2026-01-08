@@ -80,13 +80,26 @@ suite('DatabaseSync limits', () => {
     t.assert.strictEqual(db.limits.column, 50);
   });
 
+  test('null resets limit to maximum', (t) => {
+    const db = new DatabaseSync(':memory:');
+    const originalLength = db.limits.length;
+
+    // Set to a lower value
+    db.limits.length = 100;
+    t.assert.strictEqual(db.limits.length, 100);
+
+    // Reset to maximum using null
+    db.limits.length = null;
+    t.assert.strictEqual(db.limits.length, originalLength);
+  });
+
   test('throws on invalid argument type', (t) => {
     const db = new DatabaseSync(':memory:');
     t.assert.throws(() => {
       db.limits.length = 'invalid';
     }, {
       name: 'TypeError',
-      message: /Limit value must be an integer/,
+      message: /Limit value must be an integer or null/,
     });
   });
 
