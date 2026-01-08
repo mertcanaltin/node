@@ -807,8 +807,8 @@ Intercepted DatabaseSyncLimits::LimitsSetter(
       return Intercepted::kYes;
     }
   } else {
-    THROW_ERR_INVALID_ARG_TYPE(
-        isolate, "Limit value must be an integer or null.");
+    THROW_ERR_INVALID_ARG_TYPE(isolate,
+                               "Limit value must be an integer or null.");
     return Intercepted::kYes;
   }
 
