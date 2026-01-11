@@ -80,7 +80,7 @@ suite('DatabaseSync limits', () => {
     t.assert.strictEqual(db.limits.column, 50);
   });
 
-  test('null resets limit to maximum', (t) => {
+  test('Infinity resets limit to maximum', (t) => {
     const db = new DatabaseSync(':memory:');
     const originalLength = db.limits.length;
 
@@ -88,8 +88,8 @@ suite('DatabaseSync limits', () => {
     db.limits.length = 100;
     t.assert.strictEqual(db.limits.length, 100);
 
-    // Reset to maximum using null
-    db.limits.length = null;
+    // Reset to maximum using Infinity
+    db.limits.length = Infinity;
     t.assert.strictEqual(db.limits.length, originalLength);
   });
 
@@ -99,7 +99,7 @@ suite('DatabaseSync limits', () => {
       db.limits.length = 'invalid';
     }, {
       name: 'TypeError',
-      message: /Limit value must be an integer or null/,
+      message: /Limit value must be a non-negative integer or Infinity/,
     });
   });
 
@@ -110,6 +110,26 @@ suite('DatabaseSync limits', () => {
     }, {
       name: 'RangeError',
       message: /Limit value must be non-negative/,
+    });
+  });
+
+  test('throws on null value', (t) => {
+    const db = new DatabaseSync(':memory:');
+    t.assert.throws(() => {
+      db.limits.length = null;
+    }, {
+      name: 'TypeError',
+      message: /Limit value must be a non-negative integer or Infinity/,
+    });
+  });
+
+  test('throws on negative Infinity', (t) => {
+    const db = new DatabaseSync(':memory:');
+    t.assert.throws(() => {
+      db.limits.length = -Infinity;
+    }, {
+      name: 'TypeError',
+      message: /Limit value must be a non-negative integer or Infinity/,
     });
   });
 
