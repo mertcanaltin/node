@@ -79,10 +79,106 @@ InternalFieldInfoBase* BindingData::Serialize(int index) {
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 namespace {
-constexpr int MAX_SIZE_FOR_STACK_ALLOC = 4096;
-
 constexpr bool isSurrogatePair(uint16_t lead, uint16_t trail) {
   return (lead & 0xfc00) == 0xd800 && (trail & 0xfc00) == 0xdc00;
+}
+
+constexpr bool isHighSurrogate(uint16_t c) {
+  return (c & 0xfc00) == 0xd800;
+}
+
+constexpr bool isLowSurrogate(uint16_t c) {
+  return (c & 0xfc00) == 0xdc00;
+}
+
+// Computes the UTF-8 length from UTF-16 input, treating unpaired surrogates
+// as replacement characters (U+FFFD = 3 bytes in UTF-8).
+// This is a native implementation of
+// simdutf::utf8_length_from_utf16_with_replacement which is available in
+// simdutf v7.6.0+.
+size_t utf8LengthFromUtf16WithReplacement(const char16_t* data, size_t length) {
+  size_t utf8_len = 0;
+  for (size_t i = 0; i < length; i++) {
+    uint16_t c = data[i];
+    if (c < 0x80) {
+      // ASCII: 1 byte
+      utf8_len += 1;
+    } else if (c < 0x800) {
+      // 2-byte UTF-8
+      utf8_len += 2;
+    } else if (isHighSurrogate(c)) {
+      // High surrogate - check for valid pair
+      if (i + 1 < length && isLowSurrogate(data[i + 1])) {
+        // Valid surrogate pair: 4 bytes
+        utf8_len += 4;
+        i++;  // Skip low surrogate
+      } else {
+        // Unpaired high surrogate: replacement character (3 bytes)
+        utf8_len += 3;
+      }
+    } else if (isLowSurrogate(c)) {
+      // Unpaired low surrogate: replacement character (3 bytes)
+      utf8_len += 3;
+    } else {
+      // Other BMP characters: 3 bytes
+      utf8_len += 3;
+    }
+  }
+  return utf8_len;
+}
+
+// Converts UTF-16 to UTF-8, replacing unpaired surrogates with U+FFFD.
+// Returns the number of bytes written to the output buffer.
+// This is a native implementation of
+// simdutf::convert_utf16_to_utf8_with_replacement.
+size_t convertUtf16ToUtf8WithReplacement(const char16_t* data,
+                                         size_t length,
+                                         char* output) {
+  // U+FFFD in UTF-8: EF BF BD
+  constexpr char kReplacementChar[] = {static_cast<char>(0xEF),
+                                       static_cast<char>(0xBF),
+                                       static_cast<char>(0xBD)};
+  char* out = output;
+
+  for (size_t i = 0; i < length; i++) {
+    uint16_t c = data[i];
+    if (c < 0x80) {
+      // ASCII: 1 byte
+      *out++ = static_cast<char>(c);
+    } else if (c < 0x800) {
+      // 2-byte UTF-8: 110xxxxx 10xxxxxx
+      *out++ = static_cast<char>(0xC0 | (c >> 6));
+      *out++ = static_cast<char>(0x80 | (c & 0x3F));
+    } else if (isHighSurrogate(c)) {
+      // High surrogate - check for valid pair
+      if (i + 1 < length && isLowSurrogate(data[i + 1])) {
+        // Valid surrogate pair: decode to code point and encode as 4-byte UTF-8
+        uint16_t low = data[++i];
+        uint32_t codepoint = 0x10000 +
+                             ((static_cast<uint32_t>(c) - 0xD800) << 10) +
+                             (static_cast<uint32_t>(low) - 0xDC00);
+        // 4-byte UTF-8: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+        *out++ = static_cast<char>(0xF0 | (codepoint >> 18));
+        *out++ = static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F));
+        *out++ = static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+        *out++ = static_cast<char>(0x80 | (codepoint & 0x3F));
+      } else {
+        // Unpaired high surrogate: replacement character
+        memcpy(out, kReplacementChar, 3);
+        out += 3;
+      }
+    } else if (isLowSurrogate(c)) {
+      // Unpaired low surrogate: replacement character
+      memcpy(out, kReplacementChar, 3);
+      out += 3;
+    } else {
+      // Other BMP characters: 3-byte UTF-8: 1110xxxx 10xxxxxx 10xxxxxx
+      *out++ = static_cast<char>(0xE0 | (c >> 12));
+      *out++ = static_cast<char>(0x80 | ((c >> 6) & 0x3F));
+      *out++ = static_cast<char>(0x80 | (c & 0x3F));
+    }
+  }
+  return static_cast<size_t>(out - output);
 }
 
 constexpr size_t simpleUtfEncodingLength(uint16_t c) {
@@ -140,12 +236,10 @@ size_t findBestFit(const Char* data, size_t length, size_t bufferSize) {
 
     size_t chunkUtf8Len;
     if constexpr (UTF16) {
-      // TODO(anonrig): Use utf8_length_from_utf16_with_replacement when
-      // available For now, validate and use utf8_length_from_utf16
       size_t newPos = pos + chunkSize;
       if (newPos < length && isSurrogatePair(data[newPos - 1], data[newPos]))
         chunkSize--;
-      chunkUtf8Len = simdutf::utf8_length_from_utf16(data + pos, chunkSize);
+      chunkUtf8Len = utf8LengthFromUtf16WithReplacement(data + pos, chunkSize);
     } else {
       chunkUtf8Len = simdutf::utf8_length_from_latin1(data + pos, chunkSize);
     }
@@ -278,23 +372,12 @@ void BindingData::EncodeInto(const FunctionCallbackInfo<Value>& args) {
         written = simdutf::convert_utf16_to_utf8(data, read, write_result);
       }
     } else {
-      // Invalid UTF-16 with unpaired surrogates - convert to well-formed first
-      // TODO(anonrig): Use utf8_length_from_utf16_with_replacement when
-      // available
-      MaybeStackBuffer<char16_t, MAX_SIZE_FOR_STACK_ALLOC> conversion_buffer(
-          length_that_fits);
-      simdutf::to_well_formed_utf16(
-          data, length_that_fits, conversion_buffer.out());
-
-      // Now use findBestFit with the well-formed data
-      read =
-          findBestFit(conversion_buffer.out(), length_that_fits, dest_length);
+      // Invalid UTF-16 with unpaired surrogates - use replacement semantics
+      // directly without allocating a conversion buffer.
+      read = findBestFit(data, length_that_fits, dest_length);
       if (read != 0) {
-        DCHECK_LE(
-            simdutf::utf8_length_from_utf16(conversion_buffer.out(), read),
-            dest_length);
-        written = simdutf::convert_utf16_to_utf8(
-            conversion_buffer.out(), read, write_result);
+        DCHECK_LE(utf8LengthFromUtf16WithReplacement(data, read), dest_length);
+        written = convertUtf16ToUtf8WithReplacement(data, read, write_result);
       }
     }
   }
